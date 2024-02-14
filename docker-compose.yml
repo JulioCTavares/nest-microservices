@@ -1,4 +1,4 @@
-version: '3'
+version: "3.8"
 services:
   rabbitmq:
     image: 'rabbitmq:3-management'
@@ -11,4 +11,45 @@ services:
       - '15672:15672'
     env_file:
       - .env
-    
+
+  auth:
+    build:
+      context: ./
+      dockerfile: ./apps/auth/Dockerfile
+    env_file:
+      - .env
+    depends_on:
+      - rabbitmq
+      - postgres
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+    command: npm run start:dev auth
+
+  gateway:
+    build:
+      context: ./
+      dockerfile: ./apps/nest-rabbit/Dockerfile
+    ports:
+      - '4000:5000'
+    env_file:
+      - .env
+    depends_on:
+      - rabbitmq
+      - auth
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+    command: npm run start:dev nest-rabbit
+
+  postgres:
+    image: bitnami/postgresql
+    restart: unless-stopped
+    ports:
+      - '${DATABASE_PORT:?DATABASE_PORT env var is missing on .env file}:5432'
+    environment:
+      POSTGRES_PASSWORD: '${DATABASE_PASSWORD:?DATABASE_PASSWORD env var is missing on .env file}'
+      POSTGRES_USERNAME: '${DATABASE_USERNAME:?DATABASE_USERNAME env var is missing on .env file}'
+      POSTGRES_DATABASE: '${DATABASE_NAME:?DATABASE_NAME env var is missing on .env file}'
+    volumes:
+      - ./data/pg:/data/postgres
